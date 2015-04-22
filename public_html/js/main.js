@@ -1,9 +1,30 @@
 //global variables
 var spreadsheet = 'https://docs.google.com/spreadsheets/d/1kJn0gPnCHnaXb1dxq6xBX2BAKq7fJiUZfV7ogEMqUHo/pubhtml';
 var tabletop;
-var msglog = [];
-var locations = [];
-var monsters = [];
+
+
+//Wrap other variables within top-level "Game" object
+var Game = {};
+
+function newgame()
+{
+    //fill with all defaults for a new save
+    Game.msglog = [];
+    Game.locations = [];
+    Game.monsters = [];
+
+    //For testing: generate basic stats for player
+    Game.player = new entity({name: "Player", level: 1, strength: 3, agility: 3, endurance: 3, exp: 0, gp: 0});
+    
+    //stats unique to player
+    Game.player.toLevel = 5;
+    Game.player.statpoints = 0;
+
+    Game.monster = null; //Point to current monster regardless of location
+    Game.location = null; //current location
+    Game.incombat = false;
+}
+
 
 //entity prototype
 function entity(template)
@@ -23,130 +44,143 @@ function entity(template)
 }
 
 
-//For testing: generate basic stats for player
-var player = new entity({name: "Player", level: 1, strength: 3, agility: 3, endurance: 3, exp: 0, gp: 0});
-//stats unique to player
-player.toLevel = 5;
-player.statpoints = 0;
 
 //Basic monster
-var monster = new entity("Goblin", 1, 2, 2, 2, 1, 1);
+//var monster = new entity("Goblin", 1, 2, 2, 2, 1, 1);
 
 //function to format statboxes for player and enemies
 function parseStats(creature) {
-
-    //color highlighting for hp
-    var hpcol = 'green';
-    if (creature.hp < (creature.maxhp*0.25))
+    if (creature != null)
     {
-        hpcol = 'red';
-    }
-    else if (creature.hp < (creature.maxhp*0.5))
-    {
-        hpcol = 'yellow';
-    }
-    
-    //common to both
-    var label = creature.name + "<br />" +
-        "Level: " + creature.level + "<br />" + 
-        "HP: <span style=\"color:" + hpcol + "\">" + creature.hp.toFixed(2) + " / " + creature.maxhp + "</span><br />" +
-        "Strength: " + creature.strength + "<br />" +
-        "Agility: " + creature.agility + "<br />" + 
-        "Endurance: " + creature.endurance + "<br />";
+        //color highlighting for hp
+        var hpcol = 'green';
+        if (creature.hp < (creature.maxhp*0.25))
+        {
+            hpcol = 'red';
+        }
+        else if (creature.hp < (creature.maxhp*0.5))
+        {
+            hpcol = 'yellow';
+        }
 
-    if ("toLevel" in creature){
-        //We know it's the player, add more info
-        label += "<br />Exp: " + player.exp + " / " + player.toLevel + "<br />";
+        //common to both
+        var label = creature.name + "<br />" +
+            "Level: " + creature.level + "<br />" + 
+            "HP: <span style=\"color:" + hpcol + "\">" + creature.hp.toFixed(2) + " / " + creature.maxhp + "</span><br />" +
+            "Strength: " + creature.strength + "<br />" +
+            "Agility: " + creature.agility + "<br />" + 
+            "Endurance: " + creature.endurance + "<br />";
+
+        if ("toLevel" in creature){
+            //We know it's the player, add more info
+            label += "<br />Exp: " + Game.player.exp + " / " + Game.player.toLevel + "<br />";
+        }
+
+        return label;
     }
-    
-    return label;
+    else
+    {
+        //short explanation
+        return "Press \"Hunt for monsters\" to find a monster in this location.<br>(Hunting continues automatically \
+                until you leave the area or you are defeated.)";
+    }
 };
 
 //Attack function
 function attackMonster() {
-    //damage reduction of monster
-    var def = Math.max((-0.01 + 0.1*Math.log10(monster.endurance)), 0);
-    //calculate damage
-    var dmg = Math.max((player.strength * 2 * (1-def)), 1);
-    
-    //$( "#footer" ).html("Monster def: " + def + ", your dmg: " + dmg);
-    log("You attacked " + monster.name + " for " + dmg.toFixed(2) + " damage.");
-    
-    monster.hp -= dmg;
-    if (monster.hp <= 0)
+    if (Game.monster !== null)
     {
-        //handle player exp/leveling
-        defeatMonster();
-    }
-    else
-    {
-        //monster attacks back
-        def = Math.max((-0.01 + 0.1*Math.log10(player.endurance)), 0);
+        Game.incombat = true;
+        //damage reduction of monster
+        var def = Math.max((-0.01 + 0.1*Math.log10(Game.monster.endurance)), 0);
         //calculate damage
-        dmg = Math.max((monster.strength * 2 * (1-def)), 1);
-        
-        log(monster.name + " attacked you for " + dmg.toFixed(2) + " damage.");
-        
-        player.hp -= dmg;
-        if (player.hp <= 0)
+        var dmg = Math.max((Game.player.strength * 2 * (1-def)), 1);
+
+        //$( "#footer" ).html("Monster def: " + def + ", your dmg: " + dmg);
+        log("You attacked " + Game.monster.name + " for " + dmg.toFixed(2) + " damage.");
+
+        Game.monster.hp -= dmg;
+        if (Game.monster.hp <= 0)
         {
-            player.hp = 0;
-            
-            log("You died! You can't attack for 5 seconds.");
-            
-            //disable attacking for 5 seconds
-            $( ".attack" ).off("click");
-            $( ".attack" ).addClass("disabled");
-            setTimeout(function(){
-                $( ".attack" ).on("click",attackMonster);
-                $( ".attack" ).removeClass("disabled");
-            }, 5000);
+            //handle player exp/leveling
+            defeatMonster();
+        }
+        else
+        {
+            //monster attacks back
+            def = Math.max((-0.01 + 0.1*Math.log10(Game.player.endurance)), 0);
+            //calculate damage
+            dmg = Math.max((Game.monster.strength * 2 * (1-def)), 1);
+
+            log(Game.monster.name + " attacked you for " + dmg.toFixed(2) + " damage.");
+
+            Game.player.hp -= dmg;
+            if (Game.player.hp <= 0)
+            {
+                Game.player.hp = 0;
+
+                log("You died! You can't attack for 5 seconds.");
+
+                //disable attacking for 5 seconds
+                //$( ".attack" ).off("click");
+                $( ".attack" ).addClass("disabled");
+                setTimeout(function(){
+                    //$( ".attack" ).on("click",attackMonster);
+                    $( ".attack" ).removeClass("disabled");
+                }, 5000);
+
+                //monster runs away
+                Game.monster = null;
+                Game.incombat = false;
+            }
         }
     }
     
     
     //update stats
-    $( ".statbox" ).html(parseStats(player));
-    $( ".monstatbox" ).html(parseStats(monster));
+    $( ".statbox" ).html(parseStats(Game.player));
+    $( ".monstatbox" ).html(parseStats(Game.monster));
 }
 
 function defeatMonster() {
-    player.exp += monster.exp;
-    player.gp += monster.gp;
-    log("You defeated " + monster.name + " earning " + monster.exp + " EXP and " + monster.gp + " gold!");
+    Game.player.exp += Game.monster.exp;
+    Game.player.gp += Game.monster.gp;
+    log("You defeated " + Game.monster.name + " earning " + Game.monster.exp + " EXP and " + Game.monster.gp + " gold!");
     
-    if (player.exp >= player.toLevel)
+    if (Game.player.exp >= Game.player.toLevel)
     {
-        player.level++;
-        player.statpoints += 3;
-        player.maxhp = (player.level*10 + player.endurance*5);
-        player.hp = player.maxhp;
-        player.toLevel = 5 * Math.pow((player.level + 1),2);
+        Game.player.level++;
+        Game.player.statpoints += 3;
+        Game.player.maxhp = (Game.player.level*10 + Game.player.endurance*5);
+        Game.player.hp = Game.player.maxhp;
+        Game.player.toLevel = 5 * Math.pow((Game.player.level + 1),2);
         
-        log("Level up! You are now level " + player.level);
+        log("Level up! You are now level " + Game.player.level);
         
-        $( "#statpoints").html("You have " + player.statpoints + " stat points remaining.<br />");
+        $( "#statpoints").html("You have " + Game.player.statpoints + " stat points remaining.<br />");
         $( ".statup").removeClass("disabled");
         $( ".levelup").show();
     }
     
     //pick new monster randomly
-    monster = new entity(tabletop.data()[Math.floor(Math.random()*tabletop.data().length)]);
+    //Game.monster = new entity(tabletop.data()[Math.floor(Math.random()*tabletop.data().length)]);
+    Game.incombat = false;
+    hunt();
 }
 
 function level(stat) {
-    if (player.statpoints > 0 && stat in player)
+    if (Game.player.statpoints > 0 && stat in Game.player)
     {
-        player[stat]++;
-        player.statpoints--;
-        $( "#statpoints").html("You have " + player.statpoints + " stat points remaining.<br />");
+        Game.player[stat]++;
+        Game.player.statpoints--;
+        $( "#statpoints").html("You have " + Game.player.statpoints + " stat points remaining.<br />");
     }
-    if (player.statpoints === 0)
+    if (Game.player.statpoints === 0)
     {
         $( ".statup").addClass("disabled");
     }
     
-    $( ".statbox" ).html(parseStats(player));
+    $( ".statbox" ).html(parseStats(Game.player));
 }
 
 //default jQuery "ready" event
@@ -155,17 +189,25 @@ $( document ).ready(function() {
     //load monster data
     tabletop = Tabletop.init( { key: spreadsheet, callback: loaddata, simpleSheet: true, parseNumbers: true } );
     
+    newgame();
+    
    //Set the label for the stats to match the player stats
    //Build the label
    
-   $( ".statbox" ).html(parseStats(player));
+   $( ".statbox" ).html(parseStats(Game.player));
    
    //monster stats
    //$( ".monstatbox").html(parseStats(monster));
    //$( ".attack" ).on("click",attackMonster);
    
-   $( ".sel" ).on("click", gohome);
+   //$( ".sel" ).on("click", gohome);
    $( ".explore" ).on("click", explore);
+   
+   //turn on default tab clicks
+   $("#loctabs a").click(function(e){
+    	e.preventDefault();
+    	$(this).tab('show');
+    });
    
    setInterval(tick, 1000);
 });
@@ -174,7 +216,7 @@ function loaddata(data, tabletop)
 {
     console.log(data);
     //monster = new entity(data[Math.floor(Math.random()*data.length)]);
-    monsters = data;
+    Game.monsters = data;
 }
 
 function explore(targetlevel)
@@ -184,31 +226,43 @@ function explore(targetlevel)
     var newloc = {monsters: []};
     for (i = 0; i<5; i++)
     {
-        newloc.monsters.push(monsters[Math.floor(Math.random()*monsters.length)]);
+        //only push a name to save memory, do lookup later
+        newloc.monsters.push(Game.monsters[Math.floor(Math.random()*Game.monsters.length)].name);
     }
     console.log(newloc);
     
-    locations.push(newloc);
-    var locname = "Location " + locations.length;
+    Game.locations.push(newloc);
+    var locname = "Location " + Game.locations.length;
     
     //add new tab 
     $("#loctabs").append(
         $("<li>").attr("role", "presentation").append(
-            $("<a>").attr("href", "#loc"+locations.length).attr("role", "tab").attr("data-toggle", "tab")
+            $("<a>").attr("href", "#loc"+Game.locations.length).attr("role", "tab")
             .click(function (e) {
                 e.preventDefault();
                 $(this).tab('show');
-                //Load a monster from this area
-                var index = $("#loctabs").index(".active");
-                monster = locations[index-1].monsters[Math.floor(Math.random()*locations[index-1].monsters.length)];
+            }).on("shown.bs.tab", function (e) {
+                Game.location = Game.locations[$(e.target).closest("li").index()-1];
+                //console.log($(e.target).closest("li").index());
+                
+                //reset monster and disable button until hunt
+                Game.monster = null;
+                
+                $( ".attack" ).addClass("disabled");
+                
             }).append(locname)
     ));
     
     //add tab pane
     $(".tab-content").append(
-        $("<div>").attr("role", "tabpanel").attr("class", "tab-pane").attr("id", "loc"+locations.length).append(
-            $("<div>").attr("class", "monstatbox")).append(
-            $("<a>").attr("href", "#attack").text("Attack!").click(function (e) {
+        $("<div>").attr("role", "tabpanel").attr("class", "tab-pane").attr("id", "loc"+Game.locations.length).append(
+            $("<div>").attr("class", "monstatbox well")).append(
+                $("<a>").attr("href", "#hunt").attr("class", "hunt btn btn-default").text("Hunt for monsters").click(function (e) {
+                e.preventDefault();
+                hunt();
+            })).append(
+
+            $("<a>").attr("href", "#attack").attr("class", "attack btn btn-default").text("Attack!").click(function (e) {
                 e.preventDefault();
                 attackMonster();
             })
@@ -226,7 +280,32 @@ function explore(targetlevel)
     //$( "#loctabs" ).append("<span class='tab sel'>" + locname + "</span>");
 }
 
-function gohome() {
+function hunt() {
+    //look at current location
+    //Relies on Game.location being set!
+    //Get a random monster
+    var monname = Game.location.monsters[Math.floor(Math.random()*Game.location.monsters.length)];
+    
+    //filter to find the right monster
+    var match = Game.monsters.filter(function(obj) {
+        return (obj.name === monname);
+    });
+    
+    // naively use first match 
+    // (locations are generated from this list to begin with so at least 1 match SHOULD be guaranteed)
+    Game.monster = new entity(match[0]);
+    
+    //enable attack
+    //$( ".attack" ).on("click",attackMonster);
+    $( ".attack" ).removeClass("disabled");
+    
+    //disable hunt
+    $( ".hunt" ).addClass("disabled");
+    
+    $( ".monstatbox" ).html(parseStats(Game.monster));
+}
+
+/*function gohome() {
     //hide locations
     $( ".page" ).hide();
     $( ".tab" ).removeClass("sel");
@@ -254,31 +333,40 @@ function gotoloc(num) {
     }
     
     $( ".tab" ).get(num).addClass("sel");
-}
+}*/
 
 //tick function for updates
 function tick()
 {
+    //console.log(Game.incombat);
     //for now hp regen is half of endurance per second
-    player.hp = Math.min((player.hp + (player.endurance / 2)), player.maxhp);
-    monster.hp = Math.min((monster.hp + (monster.endurance / 2)), monster.maxhp);
+    //only regen when not in combat:
+    if (!Game.incombat)
+    {
+        Game.player.hp = Math.min((Game.player.hp + (Game.player.endurance / 2)), Game.player.maxhp);
+    }
+    
+    if (Game.monster === null)
+    {
+        $(".hunt").removeClass("disabled");
+    }
     
     //redraw stat displays
-    $( ".statbox" ).html(parseStats(player));
-    $( ".monstatbox" ).html(parseStats(monster));
+    $( ".statbox" ).html(parseStats(Game.player));
+    $( ".monstatbox" ).html(parseStats(Game.monster));
     
-    $( "#msglog" ).html(msglog.join('<br />'));
+    $( "#msglog" ).html(Game.msglog.join('<br />'));
 }
 
 //log to game's event/combat log. Newest entries at the top.
 function log(string)
 {
-    msglog.unshift(string);
+    Game.msglog.unshift(string);
     
     //phase out old entries to keep log short
-    while (msglog.length > 20)
+    while (Game.msglog.length > 20)
     {
-        msglog.pop();
+        Game.msglog.pop();
     }
 }
 

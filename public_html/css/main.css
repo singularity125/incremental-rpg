@@ -95,6 +95,10 @@ body {
 .nav-tabs>li {
       float:none;
     }
+    
+.tab-pane {
+    padding: 1em;
+}    
 
 #msglog {
     //background-color: #bbb;
