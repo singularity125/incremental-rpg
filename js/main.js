@@ -1,6 +1,9 @@
+/* global Tabletop */
+
 //global variables
 var spreadsheet = 'https://docs.google.com/spreadsheets/d/1kJn0gPnCHnaXb1dxq6xBX2BAKq7fJiUZfV7ogEMqUHo/pubhtml';
 var tabletop;
+var localtimestamp;
 
 
 //Wrap other variables within top-level "Game" object
@@ -11,7 +14,7 @@ function newgame()
     //fill with all defaults for a new save
     Game.msglog = [];
     Game.locations = [];
-    Game.monsters = [];
+    //Game.monsters = []; Let tabletop handle this one otherwise it is wiped on save wipe
 
     //For testing: generate basic stats for player
     Game.player = new entity({name: "Player", level: 1, strength: 5, agility: 5, endurance: 5, exp: 0, gp: 0});
@@ -23,6 +26,26 @@ function newgame()
     Game.monster = null; //Point to current monster regardless of location
     Game.location = null; //current location
     Game.incombat = false;
+    
+    
+    //if we had tabs, clean them out
+    //var tabs = $("#loctabs > li > p");
+    
+    $("#loctabs > li").each(function(i) {
+        if (i > 0) { //don't remove home tab
+            $(this).remove();
+        }
+    });
+    
+    $(".tab-content > div").each(function(i) {
+        if (i > 0) {
+            $(this).remove();
+        }
+    });
+    
+    $("#loctabs a:first").tab('show');
+    
+    $( ".levelup").hide();
 }
 
 
@@ -188,7 +211,7 @@ function attackMonster() {
             }
             else
             {
-                log(Game.monster.name + " attacked you but missed!")
+                log(Game.monster.name + " attacked you but missed!");
             }
         }
     }
@@ -254,6 +277,11 @@ $( document ).ready(function() {
     
     newgame();
     
+    localtimestamp = Date.now();
+    
+    //try loading old data
+    loadgame();
+    
    //Set the label for the stats to match the player stats
    //Build the label
    
@@ -264,13 +292,20 @@ $( document ).ready(function() {
    //$( ".attack" ).on("click",attackMonster);
    
    //$( ".sel" ).on("click", gohome);
-   $( ".explore" ).on("click", explore);
+   $( ".explore" ).on("click", addLocation);
    
    //turn on default tab clicks
    $("#loctabs a").click(function(e){
     	e.preventDefault();
         if (!Game.incombat)
             $(this).tab('show');
+    });
+    
+    $(".reset").click(function(e){
+        e.preventDefault();
+        localStorage.clear();
+        newgame();
+        log("Data cleared!");
     });
    
    setInterval(tick, 1000);
@@ -283,48 +318,90 @@ function loaddata(data, tabletop)
     Game.monsters = data;
 }
 
-function explore()
+function savegame()
 {
-    
-    //Generate areas based on a player level (25-125% of player level)
-    var monlist = Game.monsters.filter(function(mon) {
-       return (mon.level >= Math.floor(Game.player.level * 0.75) && mon.level <= Math.ceil(Game.player.level * 1.25));
-    });
-    
-    //For now pick random monsters
-    var newloc = {monsters: []};
-    
-    /*if (monlist.length === 0) //fallback for no results
+    if (Modernizr.localstorage)
     {
-        monlist = Game.monsters;
-    }*/
-    
-    shuffle(monlist);
-    
-    for (i = 0; i<5; i++)
+        localStorage.Game = JSON.stringify(Game);
+        log("Game was saved!");
+    }
+}
+
+function loadgame()
+{
+    //try to load a previous save
+    if (Modernizr.localstorage)
     {
-        if (monlist.length > i)
+        if (localStorage.Game)
         {
-            //only push a name to save memory, do lookup later
-            newloc.monsters.push({name: monlist[i].name, seen: false});
-        }
-        else //scaled monster test
-        {
-            //pull a random monster
-            var index = Math.floor(Math.random()*Game.monsters.length);
+            Game = JSON.parse(localStorage.Game);
             
-            //scale to player level +/- 1
-            var newlev = Math.round(Game.player.level + 2*Math.random() - 1);
+            //Have to rebuild the tabs for locations
+            for (var i = 0; i < Game.locations.length; i++)
+            {
+                //add new tab 
+                addLocation(undefined, Game.locations[i], Game.locations[i].name);
+            }
             
-            console.log("Level: " + newlev);
+            Game.incombat = false;
             
-            newloc.monsters.push({name: Game.monsters[index].name, seen: false, scale: newlev});
+            //if needed reshow level buttons
+            if (Game.player.statpoints > 0)
+            {
+                $( "#statpoints").html("You have " + Game.player.statpoints + " stat points remaining.<br />");
+                $( ".statup").removeClass("disabled");
+                $( ".levelup").show();
+            }
+            
+            log("Game successfully loaded");
         }
     }
+}
+
+//This function is used to add both new locations and existing ones (i.e. from reload)
+function addLocation(e, newloc, locname)
+{
     console.log(newloc);
+    console.log(locname);
     
-    Game.locations.push(newloc);
-    var locname = "Location " + Game.locations.length;
+    locname = locname || "Location " + (Game.locations.length+1); //default name
+    
+    if (newloc === undefined)
+    {
+        //Generate areas based on a player level (25-125% of player level)
+        var monlist = Game.monsters.filter(function(mon) {
+           return (mon.level >= Math.floor(Game.player.level * 0.75) && mon.level <= Math.ceil(Game.player.level * 1.25));
+        });
+
+        //For now pick random monsters
+        newloc = {monsters: [], name: locname};
+
+        shuffle(monlist);
+
+        for (i = 0; i<5; i++)
+        {
+            if (monlist.length > i)
+            {
+                //only push a name to save memory, do lookup later
+                newloc.monsters.push({name: monlist[i].name, seen: false});
+            }
+            else //scaled monster test
+            {
+                //pull a random monster
+                var index = Math.floor(Math.random()*Game.monsters.length);
+
+                //scale to player level +/- 1
+                var newlev = Math.round(Game.player.level + 2*Math.random() - 1);
+
+                console.log("Level: " + newlev);
+
+                newloc.monsters.push({name: Game.monsters[index].name, seen: false, scale: newlev});
+            }
+        }
+        console.log(newloc);
+    
+        Game.locations.push(newloc);
+    }
     
     //add new tab 
     $("#loctabs").append(
@@ -472,11 +549,15 @@ function tick()
         Game.player.hp = Math.min((Game.player.hp + (Game.player.endurance)), Game.player.maxhp);
         $("#loctabs li").removeClass("disabled");
         //console.log($("#loctabs li a"));
+        $(".monstatbox").removeClass("panel-warning");
+        $(".monstatbox").addClass("panel-default");
     }
     else
     {
         //lock down location tabs -- no fleeing!
         $("#loctabs li").addClass("disabled");
+        $(".monstatbox").removeClass("panel-default");
+        $(".monstatbox").addClass("panel-warning");
     }
     
     if (Game.monster === null)
@@ -489,6 +570,13 @@ function tick()
     $( ".monstatbox" ).html(parseStats(Game.monster));
     
     $( "#msglog" ).html(Game.msglog.join('<br />'));
+    
+    //save every 30 seconds by default
+    if (Date.now() - localtimestamp >= 30000)
+    {
+        savegame();
+        localtimestamp = Date.now();
+    }
 }
 
 //log to game's event/combat log. Newest entries at the top.
