@@ -1,9 +1,22 @@
+'use strict';
+
+// Declare app level module which depends on views, and components
+angular.module('myApp', [
+  'ngRoute',
+  'myApp.version'
+]).
+config(['$routeProvider', function($routeProvider) {
+  $routeProvider.otherwise({redirectTo: '/view1'});
+}]);
+
+
 /* global Tabletop */
 
 //global variables
 var spreadsheet = 'https://docs.google.com/spreadsheets/d/1kJn0gPnCHnaXb1dxq6xBX2BAKq7fJiUZfV7ogEMqUHo/pubhtml';
 var tabletop;
 var localtimestamp;
+var i;
 
 
 //Wrap other variables within top-level "Game" object
