@@ -1,14 +1,42 @@
 'use strict';
 
 // Declare app level module which depends on views, and components
-angular.module('myApp', [
-  'ngRoute',
-  'myApp.version'
-]).
-config(['$routeProvider', function($routeProvider) {
-  $routeProvider.otherwise({redirectTo: '/view1'});
-}]);
+var myApp = angular.module('myApp', [
+    'ngRoute'
+])
 
+//Services
+.factory('gameService', function() {
+    var gameServiceInstance;
+    return gameServiceInstance;
+})
+
+//Routing
+.config(['$routeProvider',
+    function($routeProvider) {
+        $routeProvider.when('/home', {
+            templateUrl: 'views/home-view.html',
+            controller: 'LocationController'
+        }).
+        otherwise({
+            redirectTo: '/home'
+        });
+    }])
+
+//Top-level controller
+.controller('GameController', ['$scope', function($scope) {
+    $scope.test = 'test';
+}])
+
+.controller('PlayerStatsController', ['$scope', function($scope) {
+    $scope.player = {name: "Player", level: 1, strength: 5, agility: 5, endurance: 5, exp: 0, gp: 0, toLevel: 5, statPoints: 0};
+    recalcStats($scope.player);
+}])
+
+//Controller for locations
+.controller('LocationController', ['$scope', function($scope) {
+    $scope.locations = [];
+}]);
 
 /* global Tabletop */
 

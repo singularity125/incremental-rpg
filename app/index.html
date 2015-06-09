@@ -19,22 +19,26 @@
         <!-- Latest compiled and minified CSS -->
         <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">
     </head>
-    <body>
+    <body ng-app="myApp">
         <!--[if lt IE 8]>
             <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
         <![endif]-->
 
         
-        <div class="container-fluid">
+        <div class="container-fluid" ng-controller="GameController">
             <div class="row">
                 <div id="header" class="page-header"><h3 class="center">Incremental RPG</h3></div>
             </div>
             <div class="row">
-                <div id="left" class="col-sm-3">
+                <div id="left" class="col-sm-3" ng-controller="PlayerStatsController">
                     <div class="panel panel-default">
                     <div class="panel-heading">Character Stats</div>
                     <div class="panel-body">
-                        <p class="statbox"></p>
+                        <p>Level: {{player.level}}</p>
+                        <p>HP: {{player.hp}} / {{player.maxhp}}</p>
+                        <p>Strength: {{player.strength}}</p>
+                        <p>Agility: {{player.agility}}</p>
+                        <p>Endurance: {{player.endurance}}</p>
                         <div class="levelup hidden">
                             <div id="statpoints"></div>
                             <button type="button" class="statup btn btn-default" onClick="level('strength')">Strength+</button>
@@ -48,22 +52,13 @@
                     <div class="panel panel-default">
                     <div role="tabpanel">
                         <ul id="loctabs" class="nav nav-tabs" role="tablist">
-                            <li role="presentation" class="active"><a href="#home" role="tab">Home</a></li>
+                            <li role="presentation" class="active"><a href="#/home" role="tab">Home</a></li>
+                            <li ng-repeat="location in locations" role="presentation">
+                                <a href="#/location/{{location.name}}">{{location.name}}</a>
+                            </li>
                         </ul>
 
-                        <div class="tab-content">
-                            <div role="tabpanel" class="tab-pane active" id="home">
-                                <p>You awaken in a haze, in the middle of the wilderness. You have no possessions on you,
-                                   and no recollection of your surroundings or how you got here. There's a fear dwelling
-                                   on the edge of your conscious awareness... A feeling that you were running from something
-                                   quite dangerous. But there's no signs of a recent struggle, and you're uninjured.
-                                   <br><br>
-                                   It looks like you'll have to look around and get your bearings first. (Press "Explore" to
-                                   discover new locations. Location difficulty and rewards are based on your level when you
-                                   first discover them.)
-                                </p>
-                                <div class="explore btn btn-default">Explore</div>
-                            </div>
+                        <div ng-view>
                         </div>
                     </div>
                     </div>
